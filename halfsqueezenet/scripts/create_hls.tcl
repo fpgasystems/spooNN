@@ -36,7 +36,7 @@ puts "hls_nn_lib: ${hls_nn_lib}"
 
 set config_toplevelfxn "halfsqueezenet"
 set config_proj_part "xc7z020clg400-1"
-set config_clkperiod 10
+set config_clkperiod 12
 
 open_project $proj_name
 add_files "${hls_src}/halfsqueezenet_folded.cpp" -cflags "-std=c++0x -I${hls_nn_lib}"
