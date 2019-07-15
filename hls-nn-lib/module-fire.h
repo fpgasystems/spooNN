@@ -235,3 +235,65 @@ void HALFFIRE_ACT_variable(
 	CONV2D_ACT_NoP_variable<expand3x3_K, expand3x3_MAX_Din, expand3x3_MAX_Cin, expand3x3_MAX_Cout, expand3x3_Ibit, expand3x3_Wbit, expand3x3_Mbit, expand3x3_Abit, expand3x3_MVTU_InP, expand3x3_MVTU_OutP, ScaleBits, FactorScaleBits>
 	(squeeze_out, expand3x3_weights, expand3x3_factorA, expand3x3_factorB, out, expand_Din, /*expand_Cin, expand_Cout,*/ reps);
 }
+
+template <	unsigned squeeze_K,
+			unsigned squeeze_S,
+			unsigned squeeze_MAX_Din_W,
+			unsigned squeeze_MAX_Din_H,
+			unsigned squeeze_MAX_Cin,
+			unsigned squeeze_MAX_Cout,
+			unsigned squeeze_Ibit,
+			unsigned squeeze_Wbit,
+			unsigned squeeze_Mbit,
+			unsigned squeeze_Abit,
+			unsigned squeeze_MVTU_InP,
+			unsigned squeeze_MVTU_OutP,
+
+			unsigned expand3x3_K,
+			unsigned expand3x3_S,
+			unsigned expand3x3_MAX_Din_W,
+			unsigned expand3x3_MAX_Din_H,
+			unsigned expand3x3_MAX_Cin,
+			unsigned expand3x3_MAX_Cout,
+			unsigned expand3x3_Ibit,
+			unsigned expand3x3_Wbit,
+			unsigned expand3x3_Mbit,
+			unsigned expand3x3_Abit,
+			unsigned expand3x3_MVTU_InP,
+			unsigned expand3x3_MVTU_OutP,
+
+			unsigned ScaleBits,
+			unsigned FactorScaleBits>
+void HALFFIRE_ACT_variable_RECT(
+	stream<ap_uint<squeeze_MAX_Cin*squeeze_Ibit> >& in,
+
+	const ap_uint<squeeze_MVTU_InP*squeeze_Wbit> squeeze_weights[squeeze_MVTU_OutP][((squeeze_MAX_Cin*squeeze_K*squeeze_K)/squeeze_MVTU_InP)*(squeeze_MAX_Cout/squeeze_MVTU_OutP)],
+	const ap_int<squeeze_Mbit> squeeze_factorA[squeeze_MVTU_OutP][squeeze_MAX_Cout/squeeze_MVTU_OutP],
+	const ap_int<squeeze_Mbit> squeeze_factorB[squeeze_MVTU_OutP][squeeze_MAX_Cout/squeeze_MVTU_OutP],
+
+	const ap_uint<expand3x3_MVTU_InP*expand3x3_Wbit> expand3x3_weights[expand3x3_MVTU_OutP][((expand3x3_MAX_Cin*expand3x3_K*expand3x3_K)/expand3x3_MVTU_InP)*(expand3x3_MAX_Cout/expand3x3_MVTU_OutP)], 
+	const ap_int<expand3x3_Mbit> expand3x3_factorA[expand3x3_MVTU_OutP][expand3x3_MAX_Cout/expand3x3_MVTU_OutP],
+	const ap_int<expand3x3_Mbit> expand3x3_factorB[expand3x3_MVTU_OutP][expand3x3_MAX_Cout/expand3x3_MVTU_OutP],
+
+	stream<ap_uint<expand3x3_MAX_Cout*expand3x3_Abit> >& out,
+
+	const unsigned squeeze_Din_W,
+	const unsigned squeeze_Din_H,
+	// const unsigned squeeze_Cin,
+	// const unsigned squeeze_Cout,
+
+	const unsigned expand_Din_W,
+	const unsigned expand_Din_H,
+	// const unsigned expand_Cin,
+	// const unsigned expand_Cout,
+
+	const unsigned reps = 1)
+{
+#pragma HLS DATAFLOW
+	stream<ap_uint<squeeze_MAX_Cout*squeeze_Abit> > squeeze_out("squeeze_out");
+	CONV2D_1x1_ACT_NoP_variable_RECT<squeeze_MAX_Din_W, squeeze_MAX_Din_H, squeeze_MAX_Cin, squeeze_MAX_Cout, squeeze_Ibit, squeeze_Wbit, squeeze_Mbit, squeeze_Abit, squeeze_MVTU_InP, squeeze_MVTU_OutP, ScaleBits, FactorScaleBits>
+	(in, squeeze_weights, squeeze_factorA, squeeze_factorB, squeeze_out, squeeze_Din_W, squeeze_Din_H, /*squeeze_Cin, squeeze_Cout,*/ reps);
+
+	CONV2D_ACT_NoP_variable_RECT<expand3x3_K, expand3x3_MAX_Din_W, expand3x3_MAX_Din_H, expand3x3_MAX_Cin, expand3x3_MAX_Cout, expand3x3_Ibit, expand3x3_Wbit, expand3x3_Mbit, expand3x3_Abit, expand3x3_MVTU_InP, expand3x3_MVTU_OutP, ScaleBits, FactorScaleBits>
+	(squeeze_out, expand3x3_weights, expand3x3_factorA, expand3x3_factorB, out, expand_Din_W, expand_Din_H, /*expand_Cin, expand_Cout,*/ reps);
+}

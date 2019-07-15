@@ -356,6 +356,24 @@ void ObjDetectSelect(
 	}
 }
 
+template <	unsigned InStreamW_obj,
+			unsigned InStreamW_box,
+			unsigned NumLines>
+void ObjDetectOutput(
+	stream<ap_uint<InStreamW_obj> > & in_obj,
+	stream<ap_uint<InStreamW_box> > & in_box,
+	stream<ap_uint<InStreamW_obj+InStreamW_box> > & out,
+	const unsigned reps = 1)
+{
+	ap_uint<InStreamW_obj+InStreamW_box> outbuf = 0;
+
+	for (unsigned rep = 0; rep < reps*NumLines; rep++) {
+		outbuf(InStreamW_box-1, 0) = in_box.read();
+		outbuf(InStreamW_obj-1+InStreamW_box, InStreamW_box) = in_obj.read();
+		out.write(outbuf);
+	}
+}
+
 
 template <	unsigned StreamW,
 			unsigned NumLines>
@@ -462,6 +480,44 @@ string hexFromInt(int value, unsigned precision) {
 	
 	return result;
 }
+
+template <	unsigned Din_W,
+			unsigned Din_H,
+			unsigned Cin,
+			unsigned Ibit>
+void Monitor_RECT(
+	stream<ap_uint<Cin*Ibit> > & in,
+	char* filename,
+	unsigned reps = 1)
+{
+	ofstream fileout(filename);
+
+	for (unsigned rep = 0; rep < reps; rep++) {
+#ifdef MISC_DEBUG
+		cout << "-----------------------------------" << endl;
+#endif
+		for (unsigned h = 0; h < Din_H; h++) {
+			for (unsigned w = 0; w < Din_W; w++) {
+
+				ap_uint<Cin*Ibit> temp = in.read();
+				in.write(temp);
+
+				string line = "";
+				for (unsigned c = 0; c < Cin; c++) {
+					line = hexFromInt( temp( (c+1)*Ibit - 1, c*Ibit ), Ibit ) + "_" + line;
+#ifdef MISC_DEBUG
+					cout << temp( (c+1)*Ibit - 1, c*Ibit ) << " ";
+#endif
+				}
+				fileout << "0x" << line << endl;
+			}
+#ifdef MISC_DEBUG
+			cout << endl;
+#endif
+		}
+	}
+}
+
 template <	unsigned Din,
 			unsigned Cin,
 			unsigned Ibit>
@@ -499,6 +555,53 @@ void Monitor(
 }
 
 #endif
+
+template <	unsigned TopPad,
+			unsigned BottomPad,
+			unsigned LeftPad,
+			unsigned RightPad,
+			unsigned Din_W,
+			unsigned Din_H,
+			unsigned Cin,
+			unsigned Ibit>
+void SAMEPAD_RECT(
+	stream<ap_uint<Cin*Ibit> >& in,
+	stream<ap_uint<Cin*Ibit> >& out,
+	const unsigned reps = 1)
+{
+	const unsigned Dout_W = (Din_W+LeftPad+RightPad);
+	const unsigned Dout_H = (Din_H+TopPad+BottomPad);
+	ap_uint<Cin*Ibit> temp_out = 0;
+
+	for (unsigned rep = 0; rep < reps; rep++) {
+
+		for (unsigned h = 0; h < TopPad; h++) {
+			for (unsigned s = 0; s < Dout_W; s++) {
+				out.write(0);
+			}
+		}
+
+		for (unsigned h = 0; h < Din_H; h++) {
+			for ( unsigned s = 0; s < Dout_W; s++ ) {
+#pragma HLS PIPELINE II=1
+
+				if ( (s < LeftPad) || (s >= Dout_W-RightPad) ) {
+					temp_out = 0;
+				}
+				else {
+					temp_out = in.read();
+				}
+				out.write(temp_out);
+			}
+		}
+
+		for (unsigned h = 0; h < BottomPad; h++) {
+			for (unsigned i = 0; i < Dout_W; i++) {
+				out.write(0);
+			}
+		}
+	}
+}
 
 template <	unsigned TopLeftPad,
 			unsigned BottomRightPad,
@@ -589,5 +692,52 @@ void SAMEPAD_variable(
 			}
 		}
 
+	}
+}
+
+template <	unsigned MAX_Cin,
+			unsigned Ibit>
+void SAMEPAD_variable_RECT(
+	stream<ap_uint<MAX_Cin*Ibit> >& in,
+	stream<ap_uint<MAX_Cin*Ibit> >& out,
+	const unsigned TopPad,
+	const unsigned BottomPad,
+	const unsigned LeftPad,
+	const unsigned RightPad,
+	const unsigned Din_W,
+	const unsigned Din_H,
+	const unsigned reps = 1)
+{
+	const unsigned Dout_W = (Din_W+LeftPad+RightPad);
+	const unsigned Dout_H = (Din_H+TopPad+BottomPad);
+	ap_uint<MAX_Cin*Ibit> temp_out = 0;
+
+	for (unsigned rep = 0; rep < reps; rep++) {
+
+		for (unsigned h = 0; h < TopPad; h++) {
+			for (unsigned s = 0; s < Dout_W; s++) {
+				out.write(0);
+			}
+		}
+
+		for (unsigned h = 0; h < Din_H; h++) {
+			for ( unsigned s = 0; s < Dout_W; s++ ) {
+#pragma HLS PIPELINE II=1
+
+				if ( (s < LeftPad) || (s >= Dout_W-RightPad) ) {
+					temp_out = 0;
+				}
+				else {
+					temp_out = in.read();
+				}
+				out.write(temp_out);
+			}
+		}
+
+		for (unsigned h = 0; h < BottomPad; h++) {
+			for (unsigned i = 0; i < Dout_W; i++) {
+				out.write(0);
+			}
+		}
 	}
 }

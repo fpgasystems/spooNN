@@ -471,18 +471,17 @@ def generateConfig(layers_list, path_to_config):
 			configFile.write("// Cycles per IFM: " + str(layer['cycles']) + "\n")
 
 			pragmas += "// #pragma HLS RESOURCE variable=weights" + str(layer['basemem']) + " core=RAM_1P_BRAM\n"
-			pragmas += "// #pragma HLS ARRAY_PARTITION variable=weights" + str(layer['basemem']) + " complete dim=0\n"
+			pragmas += "// #pragma HLS ARRAY_PARTITION variable=weights" + str(layer['basemem']) + " complete dim=1\n"
 			if layer['Abit'] < THRESHOLD_TO_FACTOR_TRANSITION:
-				pragmas += "// #pragma HLS ARRAY_PARTITION variable=thresholds" + str(layer['basemem']) + " complete dim=0\n"
+				pragmas += "// #pragma HLS ARRAY_PARTITION variable=thresholds" + str(layer['basemem']) + " complete dim=1\n"
 			else:
-				pragmas += "// #pragma HLS RESOURCE variable=factorA" + str(layer['basemem']) + " core=RAM_1P_BRAM\n"
-				pragmas += "// #pragma HLS RESOURCE variable=factorB" + str(layer['basemem']) + " core=RAM_1P_BRAM\n"
-				pragmas += "// #pragma HLS ARRAY_PARTITION variable=factorA" + str(layer['basemem']) + " complete dim=0\n"
-				pragmas += "// #pragma HLS ARRAY_PARTITION variable=factorB" + str(layer['basemem']) + " complete dim=0\n"
+				pragmas += "// #pragma HLS ARRAY_PARTITION variable=factorA" + str(layer['basemem']) + " complete dim=1\n"
+				pragmas += "// #pragma HLS ARRAY_PARTITION variable=factorB" + str(layer['basemem']) + " complete dim=1\n"
 
 			writeDefine(layerPrefix+'_K', layer['K'], configFile)
 			writeDefine(layerPrefix+'_S', layer['S'], configFile)
-			writeDefine(layerPrefix+'_Din', layer['input'][1], configFile)
+			writeDefine(layerPrefix+'_Din_W', layer['input'][1], configFile)
+			writeDefine(layerPrefix+'_Din_H', layer['input'][2], configFile)
 			writeDefine(layerPrefix+'_Cin', layer['input'][0], configFile)
 			writeDefine(layerPrefix+'_Cout', layer['output'][0], configFile)
 			writeDefine(layerPrefix+'_Ibit', layer['Ibit'], configFile)
@@ -534,7 +533,8 @@ def generateConfig(layers_list, path_to_config):
 
 			writeDefine(poolPrefix+'_K', layer['K'], configFile)
 			writeDefine(poolPrefix+'_S', layer['S'], configFile)
-			writeDefine(poolPrefix+'_Din', layer['input'][1], configFile)
+			writeDefine(poolPrefix+'_Din_W', layer['input'][1], configFile)
+			writeDefine(poolPrefix+'_Din_H', layer['input'][2], configFile)
 			writeDefine(poolPrefix+'_Cin', layer['input'][0], configFile)
 			writeDefine(poolPrefix+'_Ibit', layer['Ibit'], configFile)
 			writeDefine(poolPrefix+'_SWU_OutP', layer['SWU_OutP'], configFile)
@@ -672,9 +672,9 @@ def generateLayers(session, activation_bits, weight_bits, non_quantized_layers, 
 			layers_list.append(params)
 			json_out += json.dumps(params) + ','
 			last_output = [int(output_shape[3]), int(output_shape[2]), int(output_shape[1])]
-			
-			Din = float(params['input'][1])
-			Dout = Din/float(params['S'])
+
+			Din_W = float(params['input'][1])
+			Dout_W = Din_W/float(params['S'])
 			K = float(params['K'])
 			Cin = float(params['Cin'])
 			Cout = float(params['Cout'])
@@ -708,8 +708,8 @@ def generateLayers(session, activation_bits, weight_bits, non_quantized_layers, 
 				MVTU_OutP = 4
 			print('MVTU_OutP: ' + str(MVTU_OutP))
 
-			SWU_cycles = Dout*(Din + (Dout*K*K)/SWU_OutP + Constant)
-			MVTU_cycles = (Cin*K*K*Cout*Dout*Dout)/(SWU_OutP*MVTU_InP*MVTU_OutP)
+			SWU_cycles = Dout_W*(Din_W + (Dout_W*K*K)/SWU_OutP + Constant)
+			MVTU_cycles = (Cin*K*K*Cout*Dout_W*Dout_W)/(SWU_OutP*MVTU_InP*MVTU_OutP)
 
 			print('Raw SWU_cycles: ' + str(SWU_cycles) )
 			print('Raw MVTU_cycles: ' + str(MVTU_cycles) )
@@ -719,8 +719,8 @@ def generateLayers(session, activation_bits, weight_bits, non_quantized_layers, 
 			print('MVTU_InP: ' + str(MVTU_InP))
 			print('MVTU_OutP: ' + str(MVTU_OutP))
 
-			SWU_cycles = Dout*(Din + (Dout*K*K)/SWU_OutP + Constant)
-			MVTU_cycles = (Cin*K*K*Cout*Dout*Dout)/(SWU_OutP*MVTU_InP*MVTU_OutP)
+			SWU_cycles = Dout_W*(Din_W + (Dout_W*K*K)/SWU_OutP + Constant)
+			MVTU_cycles = (Cin*K*K*Cout*Dout_W*Dout_W)/(SWU_OutP*MVTU_InP*MVTU_OutP)
 
 			all_cycles = [SWU_cycles, MVTU_cycles]
 
@@ -798,8 +798,8 @@ def generateLayers(session, activation_bits, weight_bits, non_quantized_layers, 
 			json_out += json.dumps(params) + ','
 			last_output = [int(output_shape[3]), int(output_shape[2]), int(output_shape[1])]
 
-			Din = float(params['input'][1])
-			Dout = Din/float(params['S'])
+			Din_W = float(params['input'][1])
+			Dout_W = Din_W/float(params['S'])
 			K = float(params['K'])
 			Cin = float(params['Cin'])
 			Constant = 6
@@ -807,7 +807,7 @@ def generateLayers(session, activation_bits, weight_bits, non_quantized_layers, 
 			SWU_OutP = 1
 			print('SWU_OutP: ' + str(SWU_OutP))
 
-			SWU_cycles = Dout*(Din + (Dout*K*K)/SWU_OutP + Constant)
+			SWU_cycles = Dout_W*(Din_W + (Dout_W*K*K)/SWU_OutP + Constant)
 			print('Raw SWU_cycles: ' + str(SWU_cycles) )
 
 			if frequency/SWU_cycles < FMpS_target:
@@ -818,7 +818,7 @@ def generateLayers(session, activation_bits, weight_bits, non_quantized_layers, 
 			print('--- After mods are 0: ---')
 			print('SWU_OutP: ' + str(SWU_OutP))
 
-			SWU_cycles = Dout*(Din + (Dout*K*K)/SWU_OutP + Constant)
+			SWU_cycles = Dout_W*(Din_W + (Dout_W*K*K)/SWU_OutP + Constant)
 
 			print('SWU_cycles: ' + str(SWU_cycles) )
 

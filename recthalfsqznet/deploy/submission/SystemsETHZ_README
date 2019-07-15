@@ -1,0 +1,4 @@
+- The ipynb file is prepared as shown in the reference design.
+- The weights file is provided by "weights_file_vX.txt". It has to be in the same location as the ipynb file.
+- For running object detection on the images in dac_2019_contest/images directory, the cells 1-3 can be executed one after the other
+- The coordinates, time results and xml files are written in cell 4.

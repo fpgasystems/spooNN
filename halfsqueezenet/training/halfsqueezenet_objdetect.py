@@ -38,7 +38,7 @@ from tensorpack.utils.gpu import get_nr_gpu
 from dorefa import get_dorefa
 from evaluate import *
 
-DEMO_DATASET = 1
+DEMO_DATASET = 0
 
 if DEMO_DATASET == 0:
 	IMAGE_WIDTH = 640.0
@@ -47,22 +47,23 @@ else:
 	IMAGE_WIDTH = 640.0
 	IMAGE_HEIGHT = 480.0
 
-
-BITW = 1
-BITA = 5
+BITW = 32
+BITA = 32
 BITG = 32
 BATCH_SIZE = 128
 
-MONITOR = 1
+MONITOR = 0
 REAL_IMAGE = 0
+DEBUG_DATA_PIPELINE = 0;
 
 NUM_SQUEEZE_FILTERS = 32
 NUM_EXPAND_FILTERS = 96
 
-square_size = 224
-height_width = 14
-down_sample_factor = square_size/height_width
-
+resize_width = 320
+resize_height = 176
+grid_size = 16
+num_grid_cells_x = int(resize_width/grid_size)
+num_grid_cells_y = int(resize_height/grid_size)
 
 classes = [
 	['boat',0],
@@ -119,7 +120,7 @@ def intersection(rect1, rect2):
 	union = x_union*y_union
 
 	if intersection > 0:
-		scaled = float(intersection)/(down_sample_factor*down_sample_factor)
+		scaled = float(intersection)/(grid_size*grid_size)
 		if scaled > 0.1:
 			return scaled
 		else:
@@ -154,8 +155,8 @@ class DAC_Dataset(RNGDataFlow):
 			xml_name = image[0].replace('jpg','xml')
 
 			im = cv2.imread(image[0], cv2.IMREAD_COLOR)
-			im = cv2.resize(im, (square_size, square_size))
-			im = im.reshape((square_size, square_size, 3))
+			im = cv2.resize(im, (resize_width, resize_height))
+			im = im.reshape((resize_height, resize_width, 3))
 
 			meta = None
 			if os.path.isfile(image[0].replace('jpg','xml')):
@@ -179,19 +180,19 @@ class DAC_Dataset(RNGDataFlow):
 						bndbox['ymin'] = int(box.find('ymin').text)
 						bndbox['ymax'] = int(box.find('ymax').text)
 
-						bndbox['xmin'] = int(bndbox['xmin']*(square_size/IMAGE_WIDTH))
-						bndbox['xmax'] = int(bndbox['xmax']*(square_size/IMAGE_WIDTH))
-						bndbox['ymin'] = int(bndbox['ymin']*(square_size/IMAGE_HEIGHT))
-						bndbox['ymax'] = int(bndbox['ymax']*(square_size/IMAGE_HEIGHT))
+						bndbox['xmin'] = int(bndbox['xmin']*(resize_width/IMAGE_WIDTH))
+						bndbox['xmax'] = int(bndbox['xmax']*(resize_width/IMAGE_WIDTH))
+						bndbox['ymin'] = int(bndbox['ymin']*(resize_height/IMAGE_HEIGHT))
+						bndbox['ymax'] = int(bndbox['ymax']*(resize_height/IMAGE_HEIGHT))
 
-			iou = np.zeros( (height_width, height_width) )
-			for h in range(0, height_width):
-				for w in range(0, height_width):
+			iou = np.zeros( (num_grid_cells_y, num_grid_cells_x) )
+			for h in range(0, num_grid_cells_y):
+				for w in range(0, num_grid_cells_x):
 					rect = {}
-					rect['xmin'] = int(w*down_sample_factor)
-					rect['xmax'] = int((w+1)*down_sample_factor)
-					rect['ymin'] = int(h*down_sample_factor)
-					rect['ymax'] = int((h+1)*down_sample_factor)
+					rect['xmin'] = int(w*grid_size)
+					rect['xmax'] = int((w+1)*grid_size)
+					rect['ymin'] = int(h*grid_size)
+					rect['ymax'] = int((h+1)*grid_size)
 
 					if DEMO_DATASET == 0:
 						if intersection(rect, bndbox) == 0.0:
@@ -204,30 +205,32 @@ class DAC_Dataset(RNGDataFlow):
 						else:
 							iou[h,w] = 1.0
 
-					# if iou[h,w] > 0:
-					# 	cv2.rectangle(im, (int(rect['xmin']),int(rect['ymin'])), (int(rect['xmax']),int(rect['ymax'])), (0,0,iou[h,w]*255), 1)
+					if DEBUG_DATA_PIPELINE == 1:
+						if iou[h,w] > 0:
+							cv2.rectangle(im, (int(rect['xmin']),int(rect['ymin'])), (int(rect['xmax']),int(rect['ymax'])), (0,0,iou[h,w]*255), 1)
 
-			iou = iou.reshape( (height_width, height_width, 1) )
+			iou = iou.reshape( (num_grid_cells_y, num_grid_cells_x, 1) )
 
-			valid = np.zeros((height_width, height_width, 4), dtype='float32')
-			relative_bndboxes = np.zeros((height_width, height_width, 4), dtype='float32')
-			for h in range(0, height_width):
-				for w in range(0, height_width):
+			valid = np.zeros((num_grid_cells_y, num_grid_cells_x, 4), dtype='float32')
+			relative_bndboxes = np.zeros((num_grid_cells_y, num_grid_cells_x, 4), dtype='float32')
+			for h in range(0, num_grid_cells_y):
+				for w in range(0, num_grid_cells_x):
 					if iou[h, w] > 0.0:
 						valid[h,w,0] = 1.0
 						valid[h,w,1] = 1.0
 						valid[h,w,2] = 1.0
 						valid[h,w,3] = 1.0
-						relative_bndboxes[h, w, 0] = bndbox['xmin'] - w*down_sample_factor
-						relative_bndboxes[h, w, 1] = bndbox['ymin'] - h*down_sample_factor
-						relative_bndboxes[h, w, 2] = bndbox['xmax'] - w*down_sample_factor
-						relative_bndboxes[h, w, 3] = bndbox['ymax'] - h*down_sample_factor
+						relative_bndboxes[h, w, 0] = bndbox['xmin'] - w*grid_size
+						relative_bndboxes[h, w, 1] = bndbox['ymin'] - h*grid_size
+						relative_bndboxes[h, w, 2] = bndbox['xmax'] - w*grid_size
+						relative_bndboxes[h, w, 3] = bndbox['ymax'] - h*grid_size
 					else:
 						relative_bndboxes[h, w] = np.zeros(4)
 
-			# cv2.rectangle(im, (bndbox['xmin'],bndbox['ymin']), (bndbox['xmax'],bndbox['ymax']), (255,0,0), 1)
-			# cv2.imshow('image', im)
-			# cv2.waitKey(1000)
+			if DEBUG_DATA_PIPELINE == 1:
+				cv2.rectangle(im, (bndbox['xmin'],bndbox['ymin']), (bndbox['xmax'],bndbox['ymax']), (255,0,0), 1)
+				cv2.imshow('image', im)
+				cv2.waitKey(1000)
 
 			yield [im, label, iou, valid, relative_bndboxes]
 
@@ -236,11 +239,11 @@ class DAC_Dataset(RNGDataFlow):
 
 class Model(ModelDesc):
 	def _get_inputs(self):
-		return [InputDesc(tf.float32, [None, square_size, square_size, 3], 'input'),
+		return [InputDesc(tf.float32, [None, resize_height, resize_width, 3], 'input'),
 				InputDesc(tf.int32, [None], 'label'),
-				InputDesc(tf.float32, [None, height_width, height_width, 1], 'ious'),
-				InputDesc(tf.float32, [None, height_width, height_width, 4], 'valids'),
-				InputDesc(tf.float32, [None, height_width, height_width, 4], 'bndboxes')]
+				InputDesc(tf.float32, [None, num_grid_cells_y, num_grid_cells_x, 1], 'ious'),
+				InputDesc(tf.float32, [None, num_grid_cells_y, num_grid_cells_x, 4], 'valids'),
+				InputDesc(tf.float32, [None, num_grid_cells_y, num_grid_cells_x, 4], 'bndboxes')]
 
 	def _build_graph(self, inputs):
 		image, label, ious, valids, bndboxes = inputs
@@ -323,7 +326,7 @@ class Model(ModelDesc):
 			l = monitor(l, 'fire3_out')
 
 			l = halffire('fire4', l, NUM_SQUEEZE_FILTERS, NUM_EXPAND_FILTERS, 0)
-			l = monitor(l, 'fire4_out')			
+			l = monitor(l, 'fire4_out')
 
 			l = halffire('fire5', l, NUM_SQUEEZE_FILTERS, NUM_EXPAND_FILTERS, 0)
 			l = monitor(l, 'fire5_out')
@@ -464,8 +467,8 @@ def run_image(model, sess_init, image_dir):
 		index += 1
 
 		im = cv2.imread(image_dir + '/' + image, cv2.IMREAD_COLOR)
-		im = cv2.resize(im, (square_size, square_size))
-		im = im.reshape((1, square_size, square_size, 3))
+		im = cv2.resize(im, (resize_width, resize_height))
+		im = im.reshape((1, resize_height, resize_width, 3))
 
 		outputs = predictor([im])
 
@@ -495,35 +498,35 @@ def run_image(model, sess_init, image_dir):
 				if (objdetect[0, h, w] > THRESHOLD and (h == max_h-1 or h == max_h or h == max_h+1) and (w == max_w-1 or w == max_w or w == max_w+1)) or (h == max_h and w == max_w):
 					sum_labels += 1
 
-					bndbox['xmin'] += int( (bndboxes[0,h,w,0] + w*down_sample_factor) )
-					bndbox['ymin'] += int( (bndboxes[0,h,w,1] + h*down_sample_factor) )
-					bndbox['xmax'] += int( (bndboxes[0,h,w,2] + w*down_sample_factor) )
-					bndbox['ymax'] += int( (bndboxes[0,h,w,3] + h*down_sample_factor) )
+					bndbox['xmin'] += int( (bndboxes[0,h,w,0] + w*grid_size) )
+					bndbox['ymin'] += int( (bndboxes[0,h,w,1] + h*grid_size) )
+					bndbox['xmax'] += int( (bndboxes[0,h,w,2] + w*grid_size) )
+					bndbox['ymax'] += int( (bndboxes[0,h,w,3] + h*grid_size) )
 
-					temp_xmin = int(  (bndboxes[0,h,w,0] + w*down_sample_factor) *(IMAGE_WIDTH/square_size) )
-					temp_ymin = int(  (bndboxes[0,h,w,1] + h*down_sample_factor) *(IMAGE_HEIGHT/square_size) )
-					temp_xmax = int(  (bndboxes[0,h,w,2] + w*down_sample_factor) *(IMAGE_WIDTH/square_size) )
-					temp_ymax = int(  (bndboxes[0,h,w,3] + h*down_sample_factor) *(IMAGE_HEIGHT/square_size) )
+					temp_xmin = int(  (bndboxes[0,h,w,0] + w*grid_size) *(IMAGE_WIDTH/resize_width) )
+					temp_ymin = int(  (bndboxes[0,h,w,1] + h*grid_size) *(IMAGE_HEIGHT/resize_height) )
+					temp_xmax = int(  (bndboxes[0,h,w,2] + w*grid_size) *(IMAGE_WIDTH/resize_width) )
+					temp_ymax = int(  (bndboxes[0,h,w,3] + h*grid_size) *(IMAGE_HEIGHT/resize_height) )
 					cv2.rectangle(im, (temp_xmin,temp_ymin), (temp_xmax,temp_ymax), (255,0,0), 1)
 
 		bndbox['xmin'] = int(bndbox['xmin']*(1/sum_labels))
 		bndbox['ymin'] = int(bndbox['ymin']*(1/sum_labels))
 		bndbox['xmax'] = int(bndbox['xmax']*(1/sum_labels))
 		bndbox['ymax'] = int(bndbox['ymax']*(1/sum_labels))
-		bndbox['xmin'] = int(bndbox['xmin']*(IMAGE_WIDTH/square_size))
-		bndbox['ymin'] = int(bndbox['ymin']*(IMAGE_HEIGHT/square_size))
-		bndbox['xmax'] = int(bndbox['xmax']*(IMAGE_WIDTH/square_size))
-		bndbox['ymax'] = int(bndbox['ymax']*(IMAGE_HEIGHT/square_size))
+		bndbox['xmin'] = int(bndbox['xmin']*(IMAGE_WIDTH/resize_width))
+		bndbox['ymin'] = int(bndbox['ymin']*(IMAGE_HEIGHT/resize_height))
+		bndbox['xmax'] = int(bndbox['xmax']*(IMAGE_WIDTH/resize_width))
+		bndbox['ymax'] = int(bndbox['ymax']*(IMAGE_HEIGHT/resize_height))
 
 		bndbox2 = {}
-		bndbox2['xmin'] = int( bndboxes[0,max_h,max_w,0] + max_w*down_sample_factor)
-		bndbox2['ymin'] = int( bndboxes[0,max_h,max_w,1] + max_h*down_sample_factor)
-		bndbox2['xmax'] = int( bndboxes[0,max_h,max_w,2] + max_w*down_sample_factor)
-		bndbox2['ymax'] = int( bndboxes[0,max_h,max_w,3] + max_h*down_sample_factor)
-		bndbox2['xmin'] = int(bndbox2['xmin']*(IMAGE_WIDTH/square_size))
-		bndbox2['ymin'] = int(bndbox2['ymin']*(IMAGE_HEIGHT/square_size))
-		bndbox2['xmax'] = int(bndbox2['xmax']*(IMAGE_WIDTH/square_size))
-		bndbox2['ymax'] = int(bndbox2['ymax']*(IMAGE_HEIGHT/square_size))
+		bndbox2['xmin'] = int( bndboxes[0,max_h,max_w,0] + max_w*grid_size)
+		bndbox2['ymin'] = int( bndboxes[0,max_h,max_w,1] + max_h*grid_size)
+		bndbox2['xmax'] = int( bndboxes[0,max_h,max_w,2] + max_w*grid_size)
+		bndbox2['ymax'] = int( bndboxes[0,max_h,max_w,3] + max_h*grid_size)
+		bndbox2['xmin'] = int(bndbox2['xmin']*(IMAGE_WIDTH/resize_width))
+		bndbox2['ymin'] = int(bndbox2['ymin']*(IMAGE_HEIGHT/resize_height))
+		bndbox2['xmax'] = int(bndbox2['xmax']*(IMAGE_WIDTH/resize_width))
+		bndbox2['ymax'] = int(bndbox2['ymax']*(IMAGE_HEIGHT/resize_height))
 
 		print('----------------------------------------')
 		print(str(max_h*14+max_w))
@@ -532,13 +535,13 @@ def run_image(model, sess_init, image_dir):
 		print('ymin: ' + str(bndbox2['ymin']))
 		print('ymax: ' + str(bndbox2['ymax']))
 
-		cv2.rectangle(im, (int(max_w*down_sample_factor*(IMAGE_WIDTH/square_size)),int(max_h*down_sample_factor*(IMAGE_HEIGHT/square_size))), (int((max_w+1)*down_sample_factor*(IMAGE_WIDTH/square_size)),int((max_h+1)*down_sample_factor*(IMAGE_HEIGHT/square_size))), (0,0,255), 1)
+		cv2.rectangle(im, (int(max_w*grid_size*(IMAGE_WIDTH/resize_width)),int(max_h*grid_size*(IMAGE_HEIGHT/resize_height))), (int((max_w+1)*grid_size*(IMAGE_WIDTH/resize_width)),int((max_h+1)*grid_size*(IMAGE_HEIGHT/resize_height))), (0,0,255), 1)
 		cv2.rectangle(im, (true_bndbox['xmin'], true_bndbox['ymin']), (true_bndbox['xmax'], true_bndbox['ymax']), (255,0,0), 2)
 		cv2.rectangle(im, (bndbox2['xmin'], bndbox2['ymin']), (bndbox2['xmax'],bndbox2['ymax']), (0,255,0), 2)
 
 		cv2.imshow('image', im)
 		cv2.imwrite('images_log/' + image, im)
-		cv2.waitKey(800)
+		# cv2.waitKey(800)
 
 def run_single_image(model, sess_init, image):
 	print('Running single image!')
@@ -560,14 +563,14 @@ def run_single_image(model, sess_init, image):
 
 	if REAL_IMAGE == 1:
 		im = cv2.imread(image, cv2.IMREAD_COLOR)
-		im = cv2.resize(im, (square_size, square_size))
+		im = cv2.resize(im, (resize_width, resize_height))
 		cv2.imwrite('test_image.png', im)
-		im = im.reshape((1, square_size, square_size, 3))
+		im = im.reshape((1, resize_height, resize_width, 3))
 	else:
-		im = np.zeros((1, square_size, square_size, 3))
+		im = np.zeros((1, resize_height, resize_width, 3))
 		k = 0
-		for h in range(0, square_size):
-			for w in range(0,square_size):
+		for h in range(0, resize_height):
+			for w in range(0,resize_width):
 				for c in range (0,3):
 					# im[0][h][w][c] = 0
 					im[0][h][w][c] = k%256
@@ -588,14 +591,14 @@ def run_single_image(model, sess_init, image):
 				max_h = h
 				max_w = w
 	bndbox2 = {}
-	bndbox2['xmin'] = int( bndboxes[0,max_h,max_w,0] + max_w*down_sample_factor)
-	bndbox2['ymin'] = int( bndboxes[0,max_h,max_w,1] + max_h*down_sample_factor)
-	bndbox2['xmax'] = int( bndboxes[0,max_h,max_w,2] + max_w*down_sample_factor)
-	bndbox2['ymax'] = int( bndboxes[0,max_h,max_w,3] + max_h*down_sample_factor)
-	bndbox2['xmin'] = int(bndbox2['xmin']*(640/square_size))
-	bndbox2['ymin'] = int(bndbox2['ymin']*(360/square_size))
-	bndbox2['xmax'] = int(bndbox2['xmax']*(640/square_size))
-	bndbox2['ymax'] = int(bndbox2['ymax']*(360/square_size))
+	bndbox2['xmin'] = int( bndboxes[0,max_h,max_w,0] + max_w*grid_size)
+	bndbox2['ymin'] = int( bndboxes[0,max_h,max_w,1] + max_h*grid_size)
+	bndbox2['xmax'] = int( bndboxes[0,max_h,max_w,2] + max_w*grid_size)
+	bndbox2['ymax'] = int( bndboxes[0,max_h,max_w,3] + max_h*grid_size)
+	bndbox2['xmin'] = int(bndbox2['xmin']*(640/resize_width))
+	bndbox2['ymin'] = int(bndbox2['ymin']*(360/resize_height))
+	bndbox2['xmax'] = int(bndbox2['xmax']*(640/resize_width))
+	bndbox2['ymax'] = int(bndbox2['ymax']*(360/resize_height))
 
 	# im = cv2.imread(image, cv2.IMREAD_COLOR)
 	# cv2.rectangle(im, (bndbox2['xmin'], bndbox2['ymin']), (bndbox2['xmax'],bndbox2['ymax']), (0,255,0), 2)
