@@ -16,7 +16,7 @@
 #*************************************************************************
 
 CINCLUDES	+= -I../../hls-nn-lib/
-CINCLUDES 	+= -I${XILINX_VIVADO_HLS}/include/
+CINCLUDES 	+= -I${XILINX_VIVADO}/include/
 CINCLUDES 	+= -std=c++0x -Wall -Wno-unknown-pragmas -Wall -Wno-unknown-pragmas -Wno-unused-variable -g
 CXX			= g++
 LDFLAGS		= -lpthread

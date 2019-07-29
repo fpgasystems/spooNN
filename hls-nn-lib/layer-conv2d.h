@@ -15,6 +15,23 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //*************************************************************************
 
+/*
+ *** Template variable explanations
+ K: Kernel size
+ S: Stride
+ Din_W: Input feature map width
+ Din_H: Input feature map height
+ Cin: Input feature map depth (number of input channels)
+ Cout: Output feature map depth (number of output channels)
+ Ibit: Bitwidth for input feature map
+ Wbit: Bitwidth for weights
+ Mbit: Bitwidth of multiply-accumulate registers
+ Abit: Bitwidth for activation function result
+ SWU_OutP: Sliding-Window-Unit processing element (output) parallelism
+ MVTU_InP: Matrix-Vector-Multiplication-Unit SIMD (input) parallelism
+ MVTU_OutP: Matrix-Vector-Multiplication-Unit processing element (output) parallelism
+*/
+
 #pragma once
 #include <hls_stream.h>
 #include <ap_int.h>

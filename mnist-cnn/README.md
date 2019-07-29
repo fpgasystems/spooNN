@@ -36,7 +36,7 @@ Perform inference with the weights you dumped. This is useful when you want to c
 Now that we have trained a network and have the weights as C arrays, we can implement the entire CNN using the layers provided in hls-nn-lib. We can also test the functionality of our CNN entirely, by compiling the design with gcc. To be able to compile this file, you need to have Vivado HLS installed.
 
 1. Take a look at mnist-cnn-1W5A.cpp. This file contains the top function DoCompute with a stream input and a stream output. It also has an argument "numReps", which will be a runtime configurable register on the FPGA, indicating how many images the CNN should process per initiation. There is also a main function in this file, which serves as a C testbench. In the main function we feed input images to the input stream and get results from the output stream, which we can then evaluate for functional correctness.
-2. Export XILINX_VIVADO_HLS to point to your installation: $ export XILINX_VIVADO_HLS=/path/to/Xilinx/Vivado/2017.4
+2. Export XILINX_VIVADO to point to your installation: $ export XILINX_VIVADO=/path/to/Xilinx/Vivado/2018.2
 3. Compile mnist-cnn-1W5A.cpp with: /path/to/spooNN/mnist-cnn/hls$ make
 4. Test the executable with: /path/to/spooNN/mnist-cnn/hls$ ./t_1W5A /path/to/mnist.t
 
@@ -48,7 +48,7 @@ We now have a functionally correct CNN implemented in C, targeting Vivado HLS.
 2. After the RTL is generated it is packaged in an IP, that is located in /path/to/spooNN/mnist-cnn/output/hls_project/sol1/impl/ip/xilinx_com_hls_DoCompute_1_0.zip
 3. Create a directory called repo: $ mkdir repo
 4. Copy paste the IP into the new directory: /path/to/spooNN/mnist-cnn$ cp /path/to/spooNN/mnist-cnn/output/hls_project/sol1/impl/ip/xilinx_com_hls_DoCompute_1_0.zip ./repo
-5. Extract the IP: /path/to/spooNN/mnist-cnn$ unzip ./repo/xilinx_com_hls_DoCompute_1_0.zip
+5. Extract the IP: /path/to/spooNN/mnist-cnn$ unzip ./repo/xilinx_com_hls_DoCompute_1_0.zip -d ./repo/xilinx_com_hls_DoCompute_1_0
 
 Now, the repo directory can be included in Vivado and the IP we generated can be instantiated.
 

@@ -40,7 +40,7 @@ Now that we have trained a network and have the weights as C arrays, we can impl
 ![picture](folding_structure.png)
 
 1. Take a look at halfsqueezenet_folded.cpp. This implementation is more complex than the mnist-cnn example, although we are still using the layers from hls-nn-lib. The reason for the complexity is that the entire CNN for object detection does not fit onto the FPGA fabric, so we have to fold the compute, as shown in the figure above. We use demuxes and muxes to guide the dataflow, depending on which part of the CNN we want to execute with an initiation.
-2. Export XILINX_VIVADO_HLS to point to your installation: $ export XILINX_VIVADO_HLS=/path/to/Xilinx/Vivado/2017.4
+2. Export XILINX_VIVADO to point to your installation: $ export XILINX_VIVADO=/path/to/Xilinx/Vivado/2018.2
 3. Compile halfsqueezenet_folded.cpp with: /path/to/spooNN/halfsqueezenet/hls$ make
 4. Test the executable with: /path/to/spooNN/halfsqueezenet/hls$ ./t
 5. Running this will also generate a file "weights_file.txt". This is a file we need when running the CNN on the FPGA, since parts of weights will be transferred onto the FPGA during runtime.
